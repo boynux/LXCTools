@@ -9,9 +9,9 @@ function do_ssh {
 
 	if [ -a .lxc/unsecure-private-key ]; then
 		echo 'SSH Using own key.'
-		exec ssh -i .lxc/unsecure-private-key ${USER}@${IP}
+		exec ssh -A -i .lxc/unsecure-private-key ${USER}@${IP}
 	else
-		exec ssh ${USER}@${IP}
+		exec ssh -A ${USER}@${IP}
 	fi
 }
 
