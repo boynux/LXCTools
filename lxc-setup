@@ -45,12 +45,37 @@ for BOX in $RUNNING
 do
 	echo "Setting up container $BOX"
 
-	GUEST=$(host $BOX 10.0.3.1 | tail -1 | awk '{print $NF}')
-	HOST=$(/sbin/ifconfig eth0 | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
-	
-	if [ -z $HOST ] 
+	if [[ ! -z $(mount | grep -E "/$BOX/") ]]
 	then
-		HOST=`/sbin/ifconfig wlan0 | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}'`
+		if [[ ! -d $BOX ]] 
+		then
+			mkdir $BOX
+		fi
+
+		echo "Mounting $BOX"
+		sudo mount /var/lib/lxc/$BOX/rootfs/home/ubuntu/ $BOX -o bind
+	fi
+
+	# injecting key
+	if [ ! -d .lxc -o ! -a .lxc/unsecure-private-key ]; then
+		echo "Creating SSH key pair."
+
+		if [ ! -d .lxc ]; then
+			mkdir .lxc
+		fi
+
+		ssh-keygen -q -t rsa -P '' -f .lxc/unsecure-private-key
+	fi
+
+	sudo lxc-attach -n $BOX -- mkdir -p /home/${USERNAME}/.ssh >/dev/null
+	cat .lxc/unsecure-private-key.pub | sudo lxc-attach -n $BOX -- tee /home/${USERNAME}/.ssh/authorized_keys >/dev/null
+
+	GUEST=$(host $BOX 10.0.3.1 | tail -1 | awk '{print $NF}')
+	HOST=$(/sbin/ifconfig eth0 2>/dev/null | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
+	
+	if [[ -z $HOST ]] 
+	then
+		HOST=$(/sbin/ifconfig wlan0 | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
 	fi
 
 	echo "Container IP address is $GUEST"
@@ -64,28 +89,6 @@ do
 
 	if [ $? -ne 0 ]  
 	then
-
-		if [ ! -d $BOX ] 
-		then
-			mkdir $BOX
-		fi
-
-		sudo mount /var/lib/lxc/$BOX/rootfs/home/ubuntu/ $BOX -o bind
-
-		# injecting key
-		if [ ! -d .lxc -o ! -a .lxc/unsecure-private-key ]; then
-			echo "Creating SSH key pair."
-
-			if [ ! -d .lxc ]; then
-				mkdir .lxc
-			fi
-
-			ssh-keygen -q -t rsa -P '' -f .lxc/unsecure-private-key
-
-		fi
-
-		cat .lxc/unsecure-private-key.pub | sudo lxc-attach -n $BOX -- tee /home/${USERNAME}/.ssh/authorized_keys >/dev/null
-
 		sudo iptables -t nat -A PREROUTING -p tcp -d $HOST --dport $PORT -j DNAT --to $GUEST:80 
 		sudo iptables -t nat -A OUTPUT -p tcp -d $HOST --dport $PORT -j DNAT --to $GUEST:80
 
