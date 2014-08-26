@@ -1,0 +1,9 @@
+#!/bin/bash
+
+CONTAINER=$1
+
+
+if [[ ! -z $(mount | grep -E "/${CONTAINER}/") ]]
+then
+    sudo umount /var/lib/lxc/${CONTAINER}/rootfs{,.ro}
+fi

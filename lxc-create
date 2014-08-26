@@ -1,0 +1,26 @@
+#!/bin/bash
+
+CONTAINER=$1
+
+if [[ "z${CONTAINER}" == 'z' ]] || [[ ! -z $(sudo lxc-ls ${CONTAINER}) ]]; then 
+    echo "Container $CONTAINER already exists! done."
+    exit 1
+fi
+
+TARGET="/var/lib/lxc/${CONTAINER}/"
+SOURCE="/var/lib/lxc/ubuntu/"
+IMAGES="/var/lib/lxc/images/"
+IMAGE_TEMPLATE="ubuntu.sqfs"
+
+sudo mkdir ${TARGET}
+sudo cp ${SOURCE}{config,fstab} ${TARGET}
+sudo ln -s ${iMAGES}${IMAGE_TEMPLATE} ${IMAGES}${CONTAINER} 
+
+MACADDR=$(echo ${CONTAINER}|md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+sudo sed -i -E "s/hwaddr = ([a-f0-9:]+)/hwaddr = ${MACADDR}/" ${TARGET}config
+sudo sed -i "s/\/ubuntu\//\/${CONTAINER}\//g" ${TARGET}config
+sudo mkdir ${TARGET}rootfs{,.ro,.rw} -p
+sudo mkdir ${TARGET}rootfs.rw/etc/ -p
+echo ${CONTAINER} | sudo tee ${TARGET}rootfs.rw/etc/hostname 
+
+echo "done."
