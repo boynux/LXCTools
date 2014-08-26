@@ -15,10 +15,14 @@ function do_ssh {
 	fi
 }
 
+function setup {
+}
+
 function start_container {
 	CONTAINER=$1
 
-	$(sudo lxc-start -n ${CONTAINER} -d)
+	setup ${CONTAINER}
+	$(sudo lxc-start -n ${CONTAINER} -d --logfile=./${CONTAINER}.log)
 	$(sudo lxc-wait -n ${CONTAINER} -s RUNNING)
 
 	sleep 5
@@ -33,7 +37,7 @@ if [ ! -z "$2" ]; then
 fi
 
 # check if container is active 
-ACTIVE=`sudo lxc-ls --active | grep ${CONTAINER}`
+ACTIVE=`sudo lxc-ls --active | grep -E "(^| )${CONTAINER}( |$)"`
 
 if [ -z "$ACTIVE" ]; then
 	echo -n "Container ${CONTAINER} is not running. would you like to start it? "
