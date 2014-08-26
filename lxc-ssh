@@ -16,6 +16,13 @@ function do_ssh {
 }
 
 function setup {
+	CONTAINER=$1
+	IAMGE=$(sudo file /var/lib/lxc/images/${CONTAINER}.sqfs)
+
+	if [ $? -eq 0 ]; then
+		sudo mount -oloop,ro /var/lib/lxc/images/${CONTAINER}.sqfs /var/lib/lxc/${CONTAINER}/rootfs.ro
+		sudo mount -t aufs -o br:/var/lib/lxc/${CONTAINER}/rootfs.rw=rw:/var/lib/lxc/${CONTAINER}/rootfs.ro=ro,xino=/dev/shm/${CONTAINER}.xino none /var/lib/lxc/${CONTAINER}/rootfs
+	fi
 }
 
 function start_container {
