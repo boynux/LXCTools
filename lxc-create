@@ -14,7 +14,7 @@ IMAGE_TEMPLATE="ubuntu.sqfs"
 
 sudo mkdir ${TARGET}
 sudo cp ${SOURCE}{config,fstab} ${TARGET}
-sudo ln -s ${iMAGES}${IMAGE_TEMPLATE} ${IMAGES}${CONTAINER} 
+sudo ln -s ${iMAGES}${IMAGE_TEMPLATE} ${IMAGES}${CONTAINER}.sqfs
 
 MACADDR=$(echo ${CONTAINER}|md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
 sudo sed -i -E "s/hwaddr = ([a-f0-9:]+)/hwaddr = ${MACADDR}/" ${TARGET}config
