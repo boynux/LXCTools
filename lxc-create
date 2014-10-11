@@ -1,26 +1,41 @@
 #!/bin/bash
 
-CONTAINER=$1
+source functions.sh
 
-if [[ "z${CONTAINER}" == 'z' ]] || [[ ! -z $(sudo lxc-ls ${CONTAINER}) ]]; then 
-    echo "Container $CONTAINER already exists! done."
+function usage {
+    echo "Usage: $0 <template>  <target name>"
+    echo "Example: "
+    echo "    $0 ubuntu my-new-container"
+}
+
+if [[ "$#" -ne 2 ]]; then
+    usage
+    exit 1
+fi 
+
+TEMPLATE=$1
+CONTAINER=$2
+
+echo "Checking base line ...";
+is_template_exists $TEMPLATE
+if [[ "$?" -ne "0" ]]; then
+    echo "Tempalate container [$TEMPLATE] does not found!"
     exit 1
 fi
 
-TARGET="/var/lib/lxc/${CONTAINER}/"
-SOURCE="/var/lib/lxc/ubuntu/"
-IMAGES="/var/lib/lxc/images/"
-IMAGE_TEMPLATE="ubuntu.sqfs"
+is_container_exists $CONTAINER
+if [[ "$?" -eq "0" ]]; then 
+    echo "Container [$CONTAINER] already exists! done."
+    exit 1
+fi
 
-sudo mkdir ${TARGET}
-sudo cp ${SOURCE}{config,fstab} ${TARGET}
-sudo ln -s ${iMAGES}${IMAGE_TEMPLATE} ${IMAGES}${CONTAINER}.sqfs
+echo -e "Creating container [$CONTAINER] ..."
+create_container $TEMPLATE $CONTAINER
 
-MACADDR=$(echo ${CONTAINER}|md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
-sudo sed -i -E "s/hwaddr = ([a-f0-9:]+)/hwaddr = ${MACADDR}/" ${TARGET}config
-sudo sed -i "s/\/ubuntu\//\/${CONTAINER}\//g" ${TARGET}config
-sudo mkdir ${TARGET}rootfs{,.ro,.rw} -p
-sudo mkdir ${TARGET}rootfs.rw/etc/ -p
-echo ${CONTAINER} | sudo tee ${TARGET}rootfs.rw/etc/hostname 
+echo -e "Seting up $CONTAINER ..."
+config_container $CONTAINER
 
-echo "done."
+echo -e "Final touches ..."
+generate_mac $CONTAINER
+
+echo -e "done."
