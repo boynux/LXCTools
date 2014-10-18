@@ -1,24 +1,10 @@
 #!/bin/bash
 
-REQUEST=''
-RUNNING=`sudo lxc-ls --active`
+source functions.sh 
+
+REQUEST=
+RUNNING=
 USERNAME='ubuntu'
-
-function start_container {
-	CONTAINER=$1
-
-	if [[ -z $(sudo lxc-ls ${CONTAINER}) ]]; then 
-		echo "Container $CONTAINER not found, please check name."
-		exit 1
-	fi
-
-	echo "Starting up container $1, be paitient...";
-
-	$(sudo lxc-start -n ${CONTAINER} -d)
-	$(sudo lxc-wait -n ${CONTAINER} -s RUNNING)
-
-	sleep 3
-}
 
 test ! -z $1 && REQUEST="$1"
 
@@ -27,57 +13,34 @@ test -z "$RUNNING" -a -z "$REQUEST" && (echo "No container running and neither a
 if [[ ! -z $REQUEST ]]; then
 	RUNNING=${REQUEST}
 
-	for ITEM in $(sudo lxc-ls --active); do
-		test "$ITEM" == "$REQUEST" && REQUEST=''
-	done
-fi
+    is_container_active $REQUEST
 
-if [[ ! -z $REQUEST ]]; then
-	echo -n "Container ${REQUEST} is not running. would you like to start it? "
-	read answer
+    if [[ "$?" -ne "0" ]]; then
+        echo -n "Container ${REQUEST} is not running. would you like to start it? "
+        read answer
 
-	if [ "y" == "$answer" ]; then
-		start_container ${REQUEST}
-	fi
+        if [ "y" == "$answer" ]; then
+            start_container ${REQUEST}
+        fi
+    fi
 fi
 
 for BOX in $RUNNING
 do
 	echo "Setting up container $BOX"
 
-	if [[ ! -z $(mount | grep -E "/$BOX/") ]]
-	then
-		if [[ ! -d $BOX ]] 
-		then
-			mkdir $BOX
-		fi
+    mount_local_directory $BOX
 
-		echo "Mounting $BOX"
-		sudo mount /var/lib/lxc/$BOX/rootfs/home/ubuntu/ $BOX -o bind
+	if [ ! -d .lxc -o ! -a .lxc/unsecure-private-key ]; then
+        create_ssh_key_pair
 	fi
 
 	# injecting key
-	if [ ! -d .lxc -o ! -a .lxc/unsecure-private-key ]; then
-		echo "Creating SSH key pair."
+    copy_ssh_pub_key $BOX $USERNAME
 
-		if [ ! -d .lxc ]; then
-			mkdir .lxc
-		fi
-
-		ssh-keygen -q -t rsa -P '' -f .lxc/unsecure-private-key
-	fi
-
-	sudo lxc-attach -n $BOX -- mkdir -p /home/${USERNAME}/.ssh >/dev/null
-	cat .lxc/unsecure-private-key.pub | sudo lxc-attach -n $BOX -- tee /home/${USERNAME}/.ssh/authorized_keys >/dev/null
-
-	GUEST=$(host $BOX 10.0.3.1 | tail -1 | awk '{print $NF}')
-	HOST=$(/sbin/ifconfig eth0 2>/dev/null | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
+    GUEST=$(get_container_dns_ip $BOX)
+    HOST=$(get_host_ip)
 	
-	if [[ -z $HOST ]] 
-	then
-		HOST=$(/sbin/ifconfig wlan0 | grep "inet addr" | awk -F: '{print $2}' | awk '{print $1}')
-	fi
-
 	echo "Container IP address is $GUEST"
 
 	PORT=$((`echo $BOX | cut -d - -f 2` + 8080 - 2))
@@ -85,16 +48,11 @@ do
 	echo Mapping container http port to host "$PORT" port.
 
 	# check iptables rule
-	sudo iptables -t nat -C PREROUTING -p tcp -d $HOST --dport $PORT -j DNAT --to $GUEST:80 &> /dev/null
+    sudo iptables -t nat -C OUTPUT -p tcp -d 0.0.0.0 -o lxcbr0 --dport $PORT -j DNAT --to $GUEST:80
 
-	if [ $? -ne 0 ]  
+	if [ "$?" -ne "0" ]
 	then
-		sudo iptables -t nat -A PREROUTING -p tcp -d $HOST --dport $PORT -j DNAT --to $GUEST:80 
-		sudo iptables -t nat -A OUTPUT -p tcp -d $HOST --dport $PORT -j DNAT --to $GUEST:80
-
-		sudo lxc-attach -n ubuntu-2 -- iptables -t nat -F
-		sudo lxc-attach -n ubuntu-2 -- iptables -t nat -A OUTPUT -p tcp -d $HOST --dport 80 -j REDIRECT --to 80
-		sudo lxc-attach -n ubuntu-2 -- iptables -t nat -A OUTPUT -p tcp -d $HOST --dport $PORT -j REDIRECT --to 80
+        configure_http_port_frwarding  $BOX $PORT
 	fi
 
 	echo done.

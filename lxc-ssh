@@ -1,39 +1,9 @@
 #!/bin/bash
 
-CONTAINER="ubuntu-2"
+source functions.sh
+
+CONTAINER="ubuntu"
 USERNAME="ubuntu"
-
-function do_ssh {
-	IP=$1
-	USER=$2
-
-	if [ -a .lxc/unsecure-private-key ]; then
-		echo 'SSH Using own key.'
-		exec ssh -A -i .lxc/unsecure-private-key ${USER}@${IP}
-	else
-		exec ssh -A ${USER}@${IP}
-	fi
-}
-
-function setup {
-	CONTAINER=$1
-	IAMGE=$(sudo file /var/lib/lxc/images/${CONTAINER}.sqfs)
-
-	if [ $? -eq 0 ]; then
-		sudo mount -oloop,ro /var/lib/lxc/images/${CONTAINER}.sqfs /var/lib/lxc/${CONTAINER}/rootfs.ro
-		sudo mount -t aufs -o br:/var/lib/lxc/${CONTAINER}/rootfs.rw=rw:/var/lib/lxc/${CONTAINER}/rootfs.ro=ro,xino=/dev/shm/${CONTAINER}.xino none /var/lib/lxc/${CONTAINER}/rootfs
-	fi
-}
-
-function start_container {
-	CONTAINER=$1
-
-	setup ${CONTAINER}
-	$(sudo lxc-start -n ${CONTAINER} -d --logfile=./${CONTAINER}.log)
-	$(sudo lxc-wait -n ${CONTAINER} -s RUNNING)
-
-	sleep 5
-}
 
 if [ ! -z "$1" ]; then
 	CONTAINER="$1"
@@ -44,9 +14,9 @@ if [ ! -z "$2" ]; then
 fi
 
 # check if container is active 
-ACTIVE=`sudo lxc-ls --active | grep -E "(^| )${CONTAINER}( |$)"`
+is_container_active $CONTAINER
 
-if [ -z "$ACTIVE" ]; then
+if [[ "$?" -ne "0" ]]; then
 	echo -n "Container ${CONTAINER} is not running. would you like to start it? "
 	read answer
 
@@ -54,19 +24,18 @@ if [ -z "$ACTIVE" ]; then
 		start_container ${CONTAINER}
 
 		ACTIVE=${CONTAINER}
+    else
+        exit 255
 	fi
+else
+    ACTIVE=$CONTAINER
 fi
 
 if [ ! -z "$ACTIVE" ]; then
 	echo "SSH using container: [${CONTAINER}] with username [${USERNAME}]"
 
-	CONTAINER_IP=$(host $(echo ${CONTAINER} | sed 's/\.lxc//g') 10.0.3.1 | tail -1 | awk '{print $NF}')
-
+    CONTAINER_IP=$(get_container_dns_ip $CONTAINER)
 	do_ssh $CONTAINER_IP $USERNAME
 
 	echo "SSH Connection closed!"
 fi
-
-#echo ssh -o ProxyCommand nc $(host $(echo ${CONTAINER} | sed 's/\.lxc//g') 10.0.3.1 | tail -1 | awk '{print $NF}') 22
-
-
