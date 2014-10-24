@@ -26,7 +26,7 @@ function is_container_active {
 }
 
 function get_container_dns_ip {
-    IP=$(host $(echo $1 | sed 's/\.lxc//g') 10.0.3.1 | tail -1 | awk '{print $NF}')
+    IP=$(host $(echo $1 | sed 's/\.lxc$//g'). 10.0.3.1 | tail -1 | awk '{print $NF}')
 
     if [[ "$?" -eq "0" ]]; then
         echo "$IP"
