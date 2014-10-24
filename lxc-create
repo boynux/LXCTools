@@ -1,6 +1,6 @@
 #!/bin/bash
-
-source functions.sh
+RUNPATH=$(dirname $(readlink  -f $0))
+source $RUNPATH/functions.sh
 
 function usage {
     echo "Usage: $0 <template>  <target name>"
