@@ -10,8 +10,8 @@ function is_container_exists {
 }
 
 function is_template_exists {
-    sudo file "$IMAGESDIR/$1.sqfs" > /dev/null 2>$1
-    
+    sudo file "$IMAGESDIR/$1.sqfs" > /dev/null 2>&1
+
     return $?
 }
 
